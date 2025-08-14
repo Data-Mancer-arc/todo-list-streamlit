@@ -168,7 +168,7 @@ if "tasks" not in st.session_state:
     st.session_state.tasks: List[Dict[str, Any]] = []
 
 user_input = st.text_area(
-    "Enter your tasks and due dates (comma, new line, or bullet separated):",
+    "Enter your tasks and by when they have to be completed  (comma, new line, or bullet separated):",
     placeholder="e.g., Finish EEG report today, debug PN532 UART issue, buy groceries",
     height=120,
 )
@@ -182,7 +182,7 @@ with col_b:
 if gen:
     chunks = split_tasks(user_input)
     if not chunks:
-        st.warning("No tasks detected — try commas, new lines, or bullets.")
+        st.warning("I didn’t catch any tasks. Try using commas, new lines, or bullets.")
     else:
         st.session_state.tasks = [build_task_row(c) for c in chunks]
 
@@ -209,23 +209,18 @@ if st.session_state.tasks:
 
     to_delete = []
     for idx, row in enumerate(tasks_sorted):
-        col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 3, 1.5, 1.5, 2, 0.8, 0.8])
+        col1, col2, col3, col4, col5, col6 = st.columns([0.5, 5, 1.2, 1.2, 1.8, 0.8])
         with col1:
             chk = st.checkbox("", value=row["done"], key=f"done_{idx}")
         with col2:
-            new_task = st.text_input("", value=row["task"], key=f"task_{idx}")
+            st.write(f"**{row['task']}**")
         with col3:
-            new_priority = st.selectbox("", ["High", "Medium", "Low"], index=["High","Medium","Low"].index(row["priority"]), key=f"priority_{idx}")
+            st.write(f"🧯 {row['priority']}")
         with col4:
             st.write(f"⚙️ {row['effort']}")
         with col5:
-            new_due = st.date_input("", datetime.strptime(row["due"], "%Y-%m-%d"), key=f"due_{idx}")
+            st.write(f"📅 {row['due']}")
         with col6:
-            if st.button("💾", key=f"save_{idx}"):
-                row["task"] = new_task
-                row["priority"] = new_priority
-                row["due"] = new_due.strftime("%Y-%m-%d")
-        with col7:
             if st.button("🗑️", key=f"del_{idx}"):
                 to_delete.append(idx)
         row["done"] = chk
@@ -238,5 +233,24 @@ if st.session_state.tasks:
                 keep.append(t)
         st.session_state.tasks = keep
 
+    st.markdown("---")
+
+    if st.button("💡 Suggest Next Task"):
+        remaining = [t for t in st.session_state.tasks if not t["done"]]
+        if not remaining:
+            st.success("Legend behavior detected. Nothing left to do. 🎉")
+        else:
+            for t in remaining:
+                try:
+                    dt = datetime.strptime(t["due"], "%Y-%m-%d")
+                except Exception:
+                    dt = None
+                t["score"] = round(score_task(t["priority"], dt, t["effort"]), 3)
+            best = sorted(remaining, key=lambda x: x["score"], reverse=True)[0]
+            st.info(
+                f"**Do this next:** {best['task']}  \n"
+                f"_Why:_ high score from **{best['priority']}** priority, "
+                f"due **{best['due']}**, and **{best['effort']}** effort."
+            )
 else:
     st.info("Drop your text above and press **Generate** to create a smart checklist.")
